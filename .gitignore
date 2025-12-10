@@ -44,3 +44,6 @@ Thumbs.db
 test-output
 
 /generated/prisma
+
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
