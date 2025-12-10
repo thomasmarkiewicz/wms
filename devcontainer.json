@@ -1,0 +1,26 @@
+{
+  "name": "WMS Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/oven-sh/features/bun:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "prisma.prisma",
+        "GraphQL.vscode-graphql",
+        "nrwl.angular-console"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
+    }
+  },
+  "forwardPorts": [3000, 4200],
+  "postCreateCommand": "bun install",
+  "remoteUser": "node"
+}
