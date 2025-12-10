@@ -1,10 +1,7 @@
 {
   "name": "WMS Dev Container",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/oven-sh/features/bun:1": {}
-  },
+  "features": {},
   "customizations": {
     "vscode": {
       "extensions": [
@@ -20,7 +17,7 @@
       }
     }
   },
-  "forwardPorts": [3000, 4200],
-  "postCreateCommand": "bun install",
+  "forwardPorts": [3000, 4200, 5432],
+  "postCreateCommand": "curl -fsSL https://bun.sh/install | bash && export BUN_INSTALL=\"$HOME/.bun\" && export PATH=\"$BUN_INSTALL/bin:$PATH\" && bun install",
   "remoteUser": "node"
 }
