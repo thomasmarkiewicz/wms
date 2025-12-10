@@ -2,7 +2,14 @@
   "name": "@wms/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "dev": "nx run-many -t serve --projects=api,web",
+    "dev:api": "nx serve api",
+    "dev:web": "nx serve web",
+    "db:generate": "cd apps/api && bunx prisma generate",
+    "db:migrate": "cd apps/api && bunx prisma migrate dev",
+    "db:studio": "cd apps/api && bunx prisma studio"
+  },
   "private": true,
   "dependencies": {
     "@apollo/server": "^5.2.0",
