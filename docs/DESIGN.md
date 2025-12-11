@@ -166,6 +166,13 @@ For the initial implementation, the following assumptions have been made. These 
 
 ## 3. Architecture Overview
 
+**Per PROMPT.md Requirements:** This architecture illustrates data flow and system components for:
+
+- ✅ **Induct** (registering newly arrived packages) - _Implemented_
+- ✅ **Stow** (placing packages onto pallets) - _Implemented_
+- ⏸️ **Stage** (placing pallets into storage locations) - _Design only_
+- ⏸️ **Pick** (retrieving pallets from storage) - _Design only_
+
 ```mermaid
 graph TB
     Client[GraphQL Client<br/>Warehouse Scanner]
@@ -178,6 +185,8 @@ graph TB
     subgraph "Business Logic Layer"
         InductService[Induct Service]
         StowService[Stow Service]
+        StageService[Stage Service - Future]
+        PickService[Pick Service - Future]
         ValidationService[Validation Service]
     end
 
@@ -185,6 +194,7 @@ graph TB
         PackageRepo[Package Repository]
         PalletRepo[Pallet Repository]
         WarehouseRepo[Warehouse Repository]
+        StorageLocationRepo[Storage Location Repository]
     end
 
     subgraph "Persistence"
@@ -195,19 +205,39 @@ graph TB
     Server --> Resolvers
     Resolvers --> InductService
     Resolvers --> StowService
+    Resolvers -.->|Future| StageService
+    Resolvers -.->|Future| PickService
     InductService --> ValidationService
     StowService --> ValidationService
+    StageService -.-> ValidationService
+    PickService -.-> ValidationService
     InductService --> PackageRepo
     StowService --> PackageRepo
     StowService --> PalletRepo
+    StageService -.-> PalletRepo
+    StageService -.-> StorageLocationRepo
+    PickService -.-> PalletRepo
+    PickService -.-> PackageRepo
     PackageRepo --> DB
     PalletRepo --> DB
     WarehouseRepo --> DB
+    StorageLocationRepo --> DB
 ```
 
 ---
 
 ## 3. Data Model
+
+**PROMPT.md Field Mapping:**
+
+- **Induct Requirements:**
+  - ✅ Package ID → `PACKAGE.id`
+  - ✅ Receiving Warehouse ID → `PACKAGE.warehouseId`
+  - ✅ Received Timestamp → `PACKAGE.inductedAt`
+- **Stow Requirements:**
+  - ✅ Pallet ID → `PALLET.id`
+  - ✅ Stow Timestamp → `PACKAGE.stowedAt`
+  - ✅ Package IDs → `PACKAGE.palletId` (foreign key association)
 
 ```mermaid
 erDiagram
@@ -224,12 +254,12 @@ erDiagram
     }
 
     PACKAGE {
-        string id PK
-        string warehouseId FK
-        string palletId FK "nullable"
+        string id PK "Package ID"
+        string warehouseId FK "Receiving Warehouse ID"
+        string palletId FK "nullable, set during stow"
         enum status "PENDING, INDUCTED, STOWED, STAGED, PICKED"
-        timestamp inductedAt "nullable"
-        timestamp stowedAt "nullable"
+        timestamp inductedAt "Received Timestamp (nullable)"
+        timestamp stowedAt "Stow Timestamp (nullable)"
         timestamp createdAt
         timestamp updatedAt
         int version "for optimistic locking"
@@ -263,9 +293,13 @@ erDiagram
 
 ## 4. State Transitions
 
+**Per PROMPT.md:** "State transitions: INDUCTED → STOWED → STAGED → PICKED"
+
+**Implementation Note:** We added a `PENDING` state at the beginning to represent packages that have been created in the system but not yet received at the warehouse. This aligns with the prompt's note that "packages already exist in our database by the time they're inducted."
+
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: Package Created
+    [*] --> PENDING: Package Created (Pre-seeded)
     PENDING --> INDUCTED: induct()
     INDUCTED --> STOWED: stow()
     STOWED --> STAGED: stage()
@@ -420,6 +454,12 @@ enum ErrorCode {
 
 ## 6. GraphQL Schema (Draft)
 
+**Note:** Per the prompt requirements:
+
+- Packages are pre-seeded in the database with `PENDING` status (clients send package data in advance)
+- The `induct` mutation updates existing packages from `PENDING` to `INDUCTED`
+- The `stow` mutation updates packages from `INDUCTED` to `STOWED` and associates them with a pallet
+
 ```graphql
 # ============================================
 # Types
@@ -467,6 +507,10 @@ type Mutation {
   """
   Induct a single package into the warehouse.
   Updates package status from PENDING to INDUCTED.
+  Required fields match PROMPT.md:
+  - Package ID (uniquely identifies a package)
+  - Receiving Warehouse ID (uniquely identifies the induct facility)
+  - Received Timestamp (when the package was received)
   """
   inductPackage(
     packageId: ID!
@@ -483,6 +527,10 @@ type Mutation {
   """
   Stow packages onto a pallet.
   Updates package status from INDUCTED to STOWED.
+  Required fields match PROMPT.md:
+  - Pallet ID (a unique identifier for the pallet)
+  - Package IDs (a list of Package IDs to stow)
+  - Stow Timestamp (when the packages were stowed onto the pallet)
   """
   stowPackages(
     palletId: ID!
@@ -572,9 +620,11 @@ type Query {
 
 ### 7.1 Induct Validation
 
+**Per PROMPT.md:** "Clients send Veho package data in advance to inform us which packages they plan to inject into our network. In the ideal scenario, those packages already exist in our database by the time they're inducted, so your system should only need to update their status."
+
 ```typescript
 async validateInduct(packageId: string, warehouseId: string): ValidationResult {
-  // 1. Check if package exists
+  // 1. Check if package exists (should be pre-seeded with PENDING status)
   const pkg = await packageRepo.findById(packageId);
   if (!pkg) {
     return { valid: false, code: 'NOT_FOUND', message: 'Package not found' };
@@ -873,14 +923,48 @@ veho-wms/
 
 ---
 
-## 12. Implementation Phases
+## 12. Deliverable Checklist (Per PROMPT.md)
+
+### Required Deliverables
+
+- [ ] **Complete GraphQL API for induct and stow**
+  - [ ] Induct mutation (single package)
+  - [ ] Induct mutation (batch packages)
+  - [ ] Stow mutation (packages to pallet)
+  - [ ] Proper validation (state checks, existence checks, edge cases)
+  - [ ] Structured responses (success/failure with messages)
+- [ ] **Architecture diagram** (PDF/image)
+  - [ ] Shows data flow for Induct, Stow, Stage, Pick
+  - [ ] GraphQL server, resolvers, services, data access layers
+  - [ ] Data model relationships (pallets, packages, storage locations)
+  - [ ] State transitions: INDUCTED → STOWED → STAGED → PICKED
+  - [ ] Future enhancements
+- [ ] **README with:**
+  - [ ] Setup instructions
+  - [ ] Example GraphQL queries/mutations
+  - [ ] How to run tests
+- [ ] **Tests**
+  - [ ] Unit tests for core logic (validation, state handling, mutation behavior)
+  - [ ] Integration tests (optional but recommended)
+
+### Technical Requirements
+
+- [x] TypeScript and Node.js
+- [x] GraphQL schema, resolvers, and services are modular and testable
+- [x] Persistent database (PostgreSQL)
+- [x] Packages pre-seeded with PENDING status
+- [x] Package-pallet association in data model
+
+---
+
+## 13. Implementation Phases
 
 ### Phase 1: Foundation (Day 1)
 
 - [x] Create project structure
 - [ ] Setup TypeScript + Apollo Server
 - [ ] Define Prisma schema
-- [ ] Seed database with sample data
+- [ ] Seed database with sample packages (PENDING status) and warehouses
 
 ### Phase 2: Core Features (Day 2)
 
@@ -901,11 +985,12 @@ veho-wms/
 - [ ] Complete README with setup instructions
 - [ ] Add example GraphQL queries
 - [ ] Document API in schema comments
+- [ ] Export architecture diagram as PNG/PDF
 - [ ] Final review & submission
 
 ---
 
-## 13. Risk Assessment
+## 14. Risk Assessment
 
 | Risk                                      | Probability | Impact | Mitigation                                          |
 | ----------------------------------------- | ----------- | ------ | --------------------------------------------------- |
