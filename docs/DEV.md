@@ -23,3 +23,7 @@ bun db:migrate
 ```bash
 bun dev
 ```
+
+## GraphQL Playground
+
+http://localhost:3000/graphql

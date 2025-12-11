@@ -1,7 +1,14 @@
 {
   "name": "WMS Dev Container",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
-  "features": {},
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false
+    }
+  },
+  "containerEnv": {
+    "NX_INTERACTIVE": "false"
+  },
   "customizations": {
     "vscode": {
       "extensions": [
@@ -19,7 +26,7 @@
   },
   "forwardPorts": [3000, 4200, 5432],
   "postCreateCommand": "curl -fsSL https://bun.sh/install | bash && export BUN_INSTALL=\"$HOME/.bun\" && export PATH=\"$BUN_INSTALL/bin:$PATH\" && bun install",
-  "postStartCommand": "docker-compose up -d",
+  "postStartCommand": "docker compose up -d",
   "remoteUser": "node",
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/node/.ssh,readonly,type=bind",
